@@ -15,22 +15,26 @@ const CVPreview: React.FC<CVPreviewProps> = ({ data, isExport = false }) => {
 
   // Estilos Condicionais baseados no Modelo
   const getSectionTitleStyle = (): React.CSSProperties => {
+    // Estilo Base
     const base: React.CSSProperties = {
       fontSize: '12pt',
       fontWeight: 'bold',
-      marginBottom: '8pt',
       marginTop: '16pt',
       textTransform: 'uppercase',
-      display: 'inline-block',
-      width: '100%',
+      display: 'inline-block', 
+      width: 'auto', 
       lineHeight: '1.2',
       color: '#000',
-      paddingBottom: '2pt'
+      paddingBottom: '2pt', 
+      marginBottom: '8pt'
     };
 
     if (currentModel === CVModel.EXECUTIVE) {
       return {
         ...base,
+        // Executivo é a exceção: precisa ser um bloco cheio centralizado
+        display: 'block',
+        width: '100%',
         textAlign: 'center',
         border: '1pt solid black',
         padding: '6pt 12pt',
@@ -45,24 +49,36 @@ const CVPreview: React.FC<CVPreviewProps> = ({ data, isExport = false }) => {
     if (currentModel === CVModel.MINIMALIST) {
       return {
         ...base,
-        borderBottom: 'none',
-        paddingBottom: '0',
-        marginBottom: '2pt',
+        borderBottom: '0.5pt solid #999', // Sublinhado fixo para Minimalista
+        marginBottom: '8pt',
         marginTop: '12pt',
         fontSize: '11pt',
-        textDecoration: 'underline'
+        paddingBottom: '2pt'
       };
     }
 
-    if (currentModel === CVModel.CLEAN || currentModel === CVModel.MODERN) {
-      return { ...base, borderBottom: 'none', paddingBottom: '0', marginBottom: '4pt' };
-    }
-
     if (currentModel === CVModel.ELEGANT) {
-      return { ...base, borderBottom: '0.5pt solid #333', textTransform: 'none', fontSize: '14pt' };
+      return { 
+        ...base, 
+        borderBottom: '0.5pt solid #444', // Sublinhado fixo para Elegante
+        textTransform: 'none', 
+        fontSize: '14pt',
+        paddingBottom: '3pt'
+      };
     }
 
-    return { ...base, borderBottom: styles?.underlineSections ? '1pt solid #000' : 'none' };
+    // Para Clean, Moderno e Clássico (Sublinhado removido conforme solicitado)
+    const commonStyle = { 
+      ...base, 
+      borderBottom: 'none',
+      paddingBottom: '2pt'
+    };
+
+    if (currentModel === CVModel.CLEAN || currentModel === CVModel.MODERN) {
+      return { ...commonStyle, paddingBottom: '2pt', marginBottom: '6pt' };
+    }
+
+    return commonStyle;
   };
 
   const textStyle: React.CSSProperties = {
@@ -79,10 +95,44 @@ const CVPreview: React.FC<CVPreviewProps> = ({ data, isExport = false }) => {
   const firstName = names.join(' ');
 
   const renderTitle = (num: number, text: string) => {
-    if (currentModel === CVModel.MODERN || currentModel === CVModel.EXECUTIVE || currentModel === CVModel.MINIMALIST) {
-      return <div className="section-title" style={getSectionTitleStyle()}>{text}</div>;
+    const style = getSectionTitleStyle();
+    
+    // Tratamento especial para o modelo Executive que DEVE ser um bloco cheio
+    if (currentModel === CVModel.EXECUTIVE) {
+        return <div className="section-title" style={style}>{text}</div>;
     }
-    return <div className="section-title" style={getSectionTitleStyle()}>{num}. {text}</div>;
+
+    // Para os outros modelos:
+    // Separamos o wrapper (bloco) do texto (inline-block) para garantir que 
+    // o sublinhado (border-bottom) fique APENAS no tamanho do texto.
+    
+    const wrapperStyle: React.CSSProperties = {
+       marginTop: style.marginTop,
+       marginBottom: style.marginBottom,
+       textAlign: (style.textAlign as any) || 'left',
+       display: 'block', // Garante que ocupa a linha e empurra o conteúdo
+       width: '100%'
+    };
+
+    // Removemos margens do estilo interno para evitar duplicação
+    // E garantimos display: inline-block para a borda abraçar o texto
+    const innerStyle: React.CSSProperties = {
+       ...style,
+       marginTop: 0,
+       marginBottom: 0,
+       display: 'inline-block', // CRÍTICO: Faz o elemento ter apenas a largura do texto
+       width: 'auto'
+    };
+
+    const content = (currentModel === CVModel.MODERN || currentModel === CVModel.MINIMALIST) 
+      ? text 
+      : `${num}. ${text}`;
+
+    return (
+      <div style={wrapperStyle}>
+        <span className="section-title" style={innerStyle}>{content}</span>
+      </div>
+    );
   };
 
   return (
@@ -292,9 +342,11 @@ const CVPreview: React.FC<CVPreviewProps> = ({ data, isExport = false }) => {
         <p className="section-title" style={{ 
           margin: '0 0 10pt 0', 
           fontWeight: 'bold', 
-          borderBottom: (currentModel === CVModel.CLEAN || currentModel === CVModel.MODERN || currentModel === CVModel.MINIMALIST) ? 'none' : '1pt solid black', 
+          // Ajustes específicos para consistência com o modelo
+          borderBottom: 'none', // Sublinhado removido universalmente conforme feedback
           display: 'inline-block', 
-          fontSize: '12pt' 
+          fontSize: (currentModel === CVModel.ELEGANT) ? '14pt' : (currentModel === CVModel.MINIMALIST ? '11pt' : '12pt'),
+          textTransform: (currentModel === CVModel.ELEGANT) ? 'none' : 'uppercase'
         }}>
           Contactos:
         </p>

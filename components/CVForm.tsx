@@ -89,7 +89,7 @@ const CVForm: React.FC<CVFormProps> = ({ data, onUpdate }) => {
           <Settings size={20} />
           <h3 className="font-black text-xs uppercase tracking-widest">Estilo do PDF</h3>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5">Fonte</label>
             <select value={data.styles.fontFamily} onChange={(e) => onUpdate({ styles: { ...data.styles, fontFamily: e.target.value as FontType } })} className="w-full border-2 border-white p-2.5 rounded-xl text-sm shadow-sm outline-none focus:border-blue-500">
@@ -105,11 +105,6 @@ const CVForm: React.FC<CVFormProps> = ({ data, onUpdate }) => {
               <option value={1.5}>Normal</option>
               <option value={1.8}>Largo</option>
             </select>
-          </div>
-          <div className="flex items-end">
-            <button onClick={() => onUpdate({ styles: { ...data.styles, underlineSections: !data.styles.underlineSections } })} className={`w-full flex items-center justify-center gap-2 p-2.5 rounded-xl text-[10px] font-black border-2 transition-all ${data.styles.underlineSections ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-600 border-slate-100'}`}>
-              <Type size={16} /> {data.styles.underlineSections ? 'SUB. ATIVO' : 'SEM SUB.'}
-            </button>
           </div>
         </div>
       </section>

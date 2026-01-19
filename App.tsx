@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Country, FontType, CVData, BulletChar, CVModel } from './types';
 import CVForm from './components/CVForm';
 import CVPreview from './components/CVPreview';
-import { FileText, Loader2, Download, Settings2, Plus, Minus, Ban, Layout } from 'lucide-react';
+import { FileText, Loader2, Download, Settings2, Plus, Minus, Ban, Layout, Timer, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -13,7 +13,7 @@ const initialData: CVData = {
     model: CVModel.CLASSIC,
     fontFamily: FontType.TIMES_NEW_ROMAN,
     fontSize: '11pt',
-    underlineSections: true,
+    underlineSections: false,
     lineHeight: 1.5,
     primaryBullet: '•',
     secondaryBullet: '•'
@@ -44,6 +44,25 @@ const App: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [showFabMenu, setShowFabMenu] = useState(false);
 
+  // Estados do Modal de Pagamento
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentTimeLeft, setPaymentTimeLeft] = useState(70);
+  const [paymentInput, setPaymentInput] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'success' | 'expired' | 'error'>('idle');
+
+  // Lógica do Temporizador
+  useEffect(() => {
+    let interval: number;
+    if (showPaymentModal && paymentTimeLeft > 0 && paymentStatus === 'idle') {
+      interval = window.setInterval(() => {
+        setPaymentTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (paymentTimeLeft === 0 && paymentStatus === 'idle') {
+      setPaymentStatus('expired');
+    }
+    return () => clearInterval(interval);
+  }, [showPaymentModal, paymentTimeLeft, paymentStatus]);
+
   const handleUpdate = (data: Partial<CVData>) => {
     setCvData(prev => ({ ...prev, ...data }));
   };
@@ -57,17 +76,54 @@ const App: React.FC = () => {
 
   const handleModelChange = (model: CVModel) => {
     const updates: Partial<CVData['styles']> = { model };
+    
+    // Removida a lógica que forçava o sublinhado a desaparecer (underlineSections = false).
+    // Agora apenas ajusta a fonte sugerida, mas respeita a configuração de sublinhado do usuário.
     if (model === CVModel.CLEAN || model === CVModel.MODERN || model === CVModel.MINIMALIST) {
-      updates.underlineSections = false;
       updates.fontFamily = FontType.ARIAL;
-    } else if (model === CVModel.ELEGANT || model === CVModel.EXECUTIVE) {
-      updates.underlineSections = false;
-      updates.fontFamily = FontType.TIMES_NEW_ROMAN;
     } else {
-      updates.underlineSections = true;
       updates.fontFamily = FontType.TIMES_NEW_ROMAN;
     }
+    
     handleUpdate({ styles: { ...cvData.styles, ...updates } });
+  };
+
+  // Abre o modal em vez de exportar direto
+  const initiateExport = () => {
+    setShowPaymentModal(true);
+    setPaymentTimeLeft(70);
+    setPaymentStatus('idle');
+    setPaymentInput('');
+    setShowFabMenu(false);
+  };
+
+  const handleVerifyPayment = () => {
+    if (paymentStatus === 'expired') return;
+
+    const normalizedText = paymentInput.toLowerCase().trim();
+    
+    // VALIDAÇÃO RIGOROSA:
+    // 1. Verifica se tem a palavra chave de sucesso "Confirmado" ou "Transferido"
+    const hasSuccessKeyword = normalizedText.includes('confirmado') || normalizedText.includes('transferido');
+
+    // 2. Verifica se tem o nome COMPLETO da beneficiária (com ou sem acentos para garantir)
+    const hasCorrectName = normalizedText.includes('deolinda joão rafael avijala') || 
+                           normalizedText.includes('deolinda joao rafael avijala');
+    
+    // 3. Verifica se tem o número exato
+    const hasCorrectNumber = normalizedText.includes('863734977');
+
+    // SÓ ACEITA SE TODAS AS 3 CONDIÇÕES FOREM VERDADEIRAS
+    if (hasSuccessKeyword && hasCorrectName && hasCorrectNumber) {
+      setPaymentStatus('success');
+      // Aguarda 1.5s para mostrar o sucesso e depois baixa
+      setTimeout(() => {
+        handleExportPDF();
+        setShowPaymentModal(false);
+      }, 1500);
+    } else {
+      setPaymentStatus('error');
+    }
   };
 
   const handleExportPDF = async () => {
@@ -77,30 +133,33 @@ const App: React.FC = () => {
     setIsExporting(true);
     
     try {
-      // Pequeno delay para garantir renderização
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Pequeno delay para garantir renderização das fontes
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
       // Captura o canvas de todo o conteúdo
-      // Para muitas páginas (>30), usamos um scale menor (2 em vez de 4) para evitar crash de memória
+      // AUMENTAMOS O SCALE PARA 3: Isso cria uma imagem de ultra-alta resolução (como um print 4K)
+      // evitando que linhas finas fiquem borradas ou grossas demais.
       const canvas = await html2canvas(element, { 
-        scale: 2, 
+        scale: 3, 
         useCORS: true, 
         backgroundColor: "#ffffff",
         logging: false,
+        allowTaint: true,
         windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight
+        windowHeight: element.scrollHeight,
+        imageTimeout: 15000
       });
 
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
       
       // Proporção para manter no A4
-      const ratio = pdfWidth / (imgWidth / 2); // Ajustado pelo scale 2
-      const canvasPageHeight = (pdfHeight / ratio) * 2; // Altura de uma página PDF no canvas
+      const ratio = pdfWidth / (imgWidth / 3); // Ajustado pelo scale 3
+      const canvasPageHeight = (pdfHeight / ratio) * 3; // Altura de uma página PDF no canvas
       
       let heightLeft = imgHeight;
       let position = 0;
@@ -111,8 +170,14 @@ const App: React.FC = () => {
       pageCanvas.height = Math.min(imgHeight, canvasPageHeight);
       const ctx = pageCanvas.getContext('2d');
       
-      ctx?.drawImage(canvas, 0, 0, imgWidth, pageCanvas.height, 0, 0, imgWidth, pageCanvas.height);
-      pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdfWidth, (pageCanvas.height * ratio) / 2);
+      // Melhoria na qualidade do desenho
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(canvas, 0, 0, imgWidth, pageCanvas.height, 0, 0, imgWidth, pageCanvas.height);
+      }
+      
+      pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, pdfWidth, (pageCanvas.height * ratio) / 3);
       
       heightLeft -= canvasPageHeight;
       position -= canvasPageHeight;
@@ -127,10 +192,14 @@ const App: React.FC = () => {
         pCanvas.height = nextStepHeight;
         const pCtx = pCanvas.getContext('2d');
         
-        // "Recorta" a próxima parte do canvas principal
-        pCtx?.drawImage(canvas, 0, Math.abs(position), imgWidth, nextStepHeight, 0, 0, imgWidth, nextStepHeight);
+        if (pCtx) {
+          pCtx.imageSmoothingEnabled = true;
+          pCtx.imageSmoothingQuality = 'high';
+          // "Recorta" a próxima parte do canvas principal
+          pCtx.drawImage(canvas, 0, Math.abs(position), imgWidth, nextStepHeight, 0, 0, imgWidth, nextStepHeight);
+        }
         
-        pdf.addImage(pCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdfWidth, (nextStepHeight * ratio) / 2);
+        pdf.addImage(pCanvas.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, pdfWidth, (nextStepHeight * ratio) / 3);
         
         heightLeft -= canvasPageHeight;
         position -= canvasPageHeight;
@@ -164,7 +233,7 @@ const App: React.FC = () => {
           
           <div className="flex items-center gap-2">
             <button 
-              onClick={handleExportPDF} 
+              onClick={initiateExport} 
               disabled={isExporting} 
               className="bg-blue-700 text-white px-6 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-800 shadow-lg active:scale-95 transition-all disabled:opacity-50"
             >
@@ -174,6 +243,91 @@ const App: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {/* Modal de Pagamento / Confirmação */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-300">
+            {/* Cabeçalho do Modal */}
+            <div className={`p-6 text-center ${paymentStatus === 'expired' ? 'bg-red-50' : paymentStatus === 'success' ? 'bg-green-50' : 'bg-blue-50'}`}>
+              {paymentStatus === 'success' ? (
+                <div className="flex flex-col items-center gap-2">
+                  <CheckCircle className="text-green-600 w-12 h-12 mb-2" />
+                  <h2 className="text-xl font-black text-green-700">Confirmado!</h2>
+                  <p className="text-green-600 text-sm">A iniciar download...</p>
+                </div>
+              ) : paymentStatus === 'expired' ? (
+                <div className="flex flex-col items-center gap-2">
+                  <XCircle className="text-red-600 w-12 h-12 mb-2" />
+                  <h2 className="text-xl font-black text-red-700">Tempo Expirado</h2>
+                  <p className="text-red-600 text-sm">Não confirmou dentro de 70s.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="relative">
+                     <Timer className={`w-12 h-12 mb-2 transition-colors ${paymentTimeLeft < 20 ? 'text-red-600 animate-pulse' : 'text-blue-700'}`} />
+                     <span className="absolute -top-1 -right-2 bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                       {paymentTimeLeft}s
+                     </span>
+                  </div>
+                  <h2 className="text-xl font-black text-slate-800">Confirmação Pendente</h2>
+                  <p className="text-slate-500 text-xs px-4">
+                    Cole a SMS de transferência de <strong>1MT</strong> para <strong>863734977</strong> (Deolinda João Rafael Avijala) ou SIMO.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Corpo do Modal */}
+            <div className="p-6 space-y-4">
+              {paymentStatus !== 'success' && paymentStatus !== 'expired' && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase">Cole a mensagem aqui:</label>
+                    <textarea 
+                      value={paymentInput}
+                      onChange={(e) => {
+                        setPaymentInput(e.target.value);
+                        if (paymentStatus === 'error') setPaymentStatus('idle');
+                      }}
+                      placeholder="Ex: Confirmado. Voce transferiu 1MT para 863734977..."
+                      className={`w-full h-32 p-3 rounded-xl border-2 text-sm outline-none resize-none transition-all ${paymentStatus === 'error' ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-slate-200 bg-slate-50 focus:border-blue-500'}`}
+                    />
+                    {paymentStatus === 'error' && (
+                      <p className="text-red-500 text-xs font-bold flex items-center gap-1">
+                        <AlertCircle size={12} /> Mensagem inválida. Copie a SMS completa.
+                      </p>
+                    )}
+                  </div>
+                  
+                  <button 
+                    onClick={handleVerifyPayment}
+                    className="w-full bg-blue-700 hover:bg-blue-800 text-white py-3.5 rounded-xl font-black uppercase text-sm shadow-lg active:scale-95 transition-all"
+                  >
+                    Confirmar Transferência
+                  </button>
+                </>
+              )}
+
+              {paymentStatus === 'expired' && (
+                <button 
+                  onClick={initiateExport}
+                  className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3.5 rounded-xl font-black uppercase text-sm shadow-lg active:scale-95 transition-all"
+                >
+                  Tentar Novamente
+                </button>
+              )}
+              
+              <button 
+                onClick={() => setShowPaymentModal(false)}
+                className="w-full text-slate-400 text-xs font-bold uppercase hover:text-slate-600 py-2"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative bg-slate-200">
         <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-100 no-print">
