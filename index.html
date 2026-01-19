@@ -1,0 +1,101 @@
+
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global CV Architect</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Otimização para visualização e impressão de alta qualidade */
+        @media print { 
+            .no-print, header, footer, .fab-menu, button, .settings-fab { display: none !important; } 
+            
+            body { 
+                background: white !important; 
+                margin: 0 !important; 
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            #root > div > main {
+                background: white !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+
+            /* Garante que o preview ocupe a largura total da folha A4 na impressão nativa */
+            #cv-preview-container-capture {
+                box-shadow: none !important;
+                margin: 0 !important;
+                transform: none !important;
+                width: 210mm !important;
+            }
+        }
+
+        /* Regras críticas para quebras de página inteligentes no PDF (30+ páginas) */
+        section {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            margin-bottom: 12pt;
+        }
+
+        /* Evita que tabelas de dados ou línguas fiquem cortadas ao meio */
+        table, tr, td {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        /* Mantém títulos sempre colados ao conteúdo que vem abaixo */
+        h1, h2, h3, .section-title {
+            page-break-after: avoid;
+            break-after: avoid;
+        }
+
+        /* Suporte a fontes serifadas clássicas */
+        @font-face {
+            font-family: 'Times New Roman';
+            src: local('Times New Roman');
+        }
+
+        /* Estilização customizada da barra de rolagem */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "jspdf": "https://esm.sh/jspdf@^2.5.1",
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-200 text-slate-900 antialiased">
+    <!-- O React montará a aplicação inteira dentro desta div -->
+    <div id="root"></div>
+
+    <!-- Script de inicialização do sistema -->
+    <script type="module" src="./index.tsx"></script>
+</body>
+</html>
